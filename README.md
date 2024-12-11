@@ -13,7 +13,7 @@ This thesis investigates the new paradigm of Defensive Rebalancing in the contex
 ### Installation
 1. Clone this repository:
    ```bash
-   git clone https://github.com/your-repo/defensive-rebalancing.git
+   git clone https://github.com/ruidazeng/defensive-rebalancing.git
    ```
 2. Navigate to the project directory:
    ```bash
