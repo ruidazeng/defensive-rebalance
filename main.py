@@ -1,73 +1,41 @@
-from typing import TypedDict
+import arbitrage
+import numpy as np
 
-class PoolDBData(TypedDict):
-    rpcData: str
-    baseReserve: str
-    quoteReserve: str
-    mintAAmount: str
-    mintBAmount: str
-    poolPrice: str
-    lastUpdated: int
-    isValid: bool
-    accountId: str  # Replace with PublicKey type if using a library that supports it
-    programId: str  # Replace with PublicKey type if using a library that supports it
-
-def process_amm_data(pools: list[PoolDBData]):
-    """
-    Process data for every AMM pool to detect arbitrage opportunities and rebalance portfolios.
-
-    Args:
-        pools (list[PoolDBData]): List of AMM pool data.
-
-    Returns:
-        None
-    """
-    for pool in pools:
-        print(f"Processing pool: {pool['accountId']}")
-
-        # Extract necessary data
-        base_reserve = float(pool['baseReserve'])
-        quote_reserve = float(pool['quoteReserve'])
-        pool_price = float(pool['poolPrice'])
-        is_valid = pool['isValid']
-
-        if not is_valid:
-            print(f"Pool {pool['accountId']} is invalid. Skipping.")
-            continue
-
-        # Example processing: Detect arbitrage opportunities
-        print(f"Base Reserve: {base_reserve}, Quote Reserve: {quote_reserve}, Pool Price: {pool_price}")
-
-        # Example processing logic here (placeholder)
-        # e.g., calculate arbitrage potential, rebalance portfolio
-
+# Example usage
 if __name__ == "__main__":
-    # Example pool data
-    pools = [
-        {
-            "rpcData": "data1",
-            "baseReserve": "1000",
-            "quoteReserve": "500",
-            "mintAAmount": "200",
-            "mintBAmount": "300",
-            "poolPrice": "2.0",
-            "lastUpdated": 1638307200,
-            "isValid": True,
-            "accountId": "Account1",
-            "programId": "Program1",
-        },
-        {
-            "rpcData": "data2",
-            "baseReserve": "1500",
-            "quoteReserve": "750",
-            "mintAAmount": "400",
-            "mintBAmount": "600",
-            "poolPrice": "2.5",
-            "lastUpdated": 1638307300,
-            "isValid": False,
-            "accountId": "Account2",
-            "programId": "Program2",
-        },
+    # Problem data
+    global_indices = list(range(4))
+    local_indices = [
+        [0, 1, 2, 3],
+        [0, 1],
+        [1, 2],
+        [2, 3],
+        [2, 3]
     ]
-
-    process_amm_data(pools)
+    reserves = list(map(np.array, [
+        [4, 4, 4, 4],
+        [10, 1],
+        [1, 5],
+        [40, 50],
+        [10, 10]
+    ]))
+    fees = [.998, .997, .997, .997, .999]
+    market_value = [1.5, 10, 2, 3]
+    
+    # Initialize and run optimization
+    arbitrage = arbitrage.DexArbitrage(global_indices, local_indices, reserves, fees, market_value)
+    
+    try:
+        optimal_value, results = arbitrage.solve()
+        analysis = arbitrage.analyze_trades(results)
+        
+        print(f"Optimal value: {optimal_value:.4f}")
+        print(f"Total value traded: {analysis['total_value_traded']:.4f}")
+        print(f"Total fees paid: {analysis['fees_paid']:.4f}")
+        print(f"Active pools: {analysis['active_pools']}")
+        print("Profit by token:")
+        for i, profit in enumerate(analysis['profit_by_token']):
+            print(f"  Token {i}: {profit:.4f}")
+            
+    except Exception as e:
+        print(f"Error: {e}")
