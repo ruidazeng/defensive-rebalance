@@ -1,3 +1,4 @@
+cvxpy
 networkx
 numpy
 scipy
