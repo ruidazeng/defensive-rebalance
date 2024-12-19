@@ -1,53 +1,31 @@
-import numpy as np
-import cvxpy as cp
+from typing import List
+from pool_db_data import PoolDBData
+ 
+def find_arbitrage_opportunities(pool_data: List[PoolDBData]):
+    # Filter only valid pools
+    valid_pools = [p for p in pool_data if p.isValid]
 
-def solve_arbitrage(global_indices, local_indices, reserves, fees, market_values, amm_types, weights=None):
-    n = len(global_indices)
-    m = len(local_indices)
+    # Extract prices as floats
+    # Note: poolPrice is assumed to be the direct ratio price (quote per base).
+    pool_prices = [(p.rpcData, float(p.poolPrice)) for p in valid_pools]
 
-    # Build local-to-global mapping matrices
-    A = []
-    for l in local_indices:
-        n_i = len(l)
-        A_i = np.zeros((n, n_i))
-        for i, idx in enumerate(l):
-            A_i[idx, i] = 1
-        A.append(A_i)
+    if not pool_prices:
+        print("No valid pools available.")
+        return
 
-    # Decision variables
-    deltas = [cp.Variable(len(l), nonneg=True) for l in local_indices]
-    lambdas = [cp.Variable(len(l), nonneg=True) for l in local_indices]
+    # Identify min and max price pools
+    min_price_pool = min(pool_prices, key=lambda x: x[1])
+    max_price_pool = max(pool_prices, key=lambda x: x[1])
 
-    # Net token flow
-    psi = cp.sum([A_i @ (D - L) for A_i, D, L in zip(A, deltas, lambdas)])
+    min_price = min_price_pool[1]
+    max_price = max_price_pool[1]
 
-    # Objective
-    obj = cp.Maximize(market_values @ psi)
-
-    new_reserves = [R + gamma_i * D - L for R, gamma_i, D, L in zip(reserves, fees, deltas, lambdas)]
-
-    cons = []
-    for i, amm_type in enumerate(amm_types):
-        R_old = reserves[i]
-        R_new = new_reserves[i]
-        if amm_type.lower() == "balancer":
-            if weights is None or weights[i] is None:
-                raise ValueError("Balancer pool requires weights.")
-            cons.append(cp.geo_mean(R_new, p=weights[i]) >= cp.geo_mean(R_old, p=weights[i]))
-        elif amm_type.lower() == "uniswap_v2":
-            # Uniswap v2: constant product
-            cons.append(cp.geo_mean(R_new) >= cp.geo_mean(R_old))
-        elif amm_type.lower() == "constant_product":
-            cons.append(cp.geo_mean(R_new) >= cp.geo_mean(R_old))
-        elif amm_type.lower() == "constant_sum":
-            cons.append(cp.sum(R_new) >= cp.sum(R_old))
-            cons.append(R_new >= 0)
-        else:
-            raise ValueError(f"Unsupported AMM type: {amm_type}")
-
-    cons.append(psi >= 0)
-
-    prob = cp.Problem(obj, cons)
-    prob.solve()
-
-    return prob.value, psi.value, [d.value for d in deltas], [l.value for l in lambdas]
+    # Check if there's a profitable price difference
+    if max_price > min_price:
+        # Potential arbitrage margin per base unit
+        margin = max_price - min_price
+        print(f"Arbitrage opportunity found:")
+        print(f"Buy from {min_price_pool[0]} at price {min_price} and sell to {max_price_pool[0]} at price {max_price}.")
+        print(f"Potential margin per base token: {margin}")
+    else:
+        print("No arbitrage opportunity found.")
